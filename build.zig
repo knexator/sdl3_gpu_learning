@@ -18,6 +18,7 @@ pub fn build(b: *std.Build) void {
     const sdl_lib_zig: @import("translate_c").Translator = .init(tc_dep, .{
         .target = target,
         .optimize = optimize,
+        .default_init = true,
         .c_source_file = b.addWriteFiles().add("wrapper.h",
             \\#define SDL_DISABLE_OLD_NAMES
             \\#include <SDL3/SDL.h>
@@ -30,7 +31,7 @@ pub fn build(b: *std.Build) void {
     sdl_lib_zig.linkLibrary(sdl_lib);
 
     const app_exe = b.addExecutable(.{
-        .name = "breakout",
+        .name = "gamename",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
