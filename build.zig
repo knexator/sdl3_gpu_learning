@@ -51,6 +51,10 @@ pub fn build(b: *std.Build) void {
     const shaders: []const []const u8 = &.{
         "UVColor.frag",
         "PullSpriteBatch.vert",
+        "PositionColor.vert",
+        "PositionColorInstanced.vert",
+        "PositionColorTransform.vert",
+        "SolidColor.frag",
     };
     inline for (shaders) |shader| {
         const compile_shader_cmd = std.Build.Step.Run.create(b, "compile shader");
