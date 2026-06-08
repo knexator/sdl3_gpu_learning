@@ -47,6 +47,23 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(app_exe);
 
+    const shadercross_exe = b.dependency("shadercross", .{}).path("bin/shadercross.exe");
+    const shaders: []const []const u8 = &.{
+        "UVColor.frag",
+        "PullSpriteBatch.vert",
+    };
+    inline for (shaders) |shader| {
+        const compile_shader_cmd = std.Build.Step.Run.create(b, "compile shader");
+        compile_shader_cmd.addFileArg(shadercross_exe);
+        compile_shader_cmd.addFileArg(b.path("shaders/" ++ shader ++ ".hlsl"));
+        compile_shader_cmd.addArg("--output");
+        const compiled_shader = compile_shader_cmd.addOutputFileArg(shader ++ ".spv");
+
+        app_exe.root_module.addAnonymousImport(shader, .{
+            .root_source_file = compiled_shader,
+        });
+    }
+
     const run_app = b.addRunArtifact(app_exe);
     if (b.args) |args| run_app.addArgs(args);
     // run_app.addPassthruArgs();
