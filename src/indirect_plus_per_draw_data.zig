@@ -9,19 +9,24 @@ var pipeline: *c.SDL_GPUGraphicsPipeline = undefined;
 var vertex_buffer: *c.SDL_GPUBuffer = undefined;
 var index_buffer: *c.SDL_GPUBuffer = undefined;
 var draw_buffer: *c.SDL_GPUBuffer = undefined;
+var things_buffer: *c.SDL_GPUBuffer = undefined;
 
 const PositionColorVertex = extern struct {
     pos: [3]f32,
     color: [4]u8,
 };
 
+const PerDrawData = extern struct {
+    offset: [2]f32,
+};
+
 pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !void {
     if (true) { // build pipeline
         const vertex_shader = try loadShader(
-            "PositionColor.vert",
+            "PositionColorMine.vert",
             0,
             0,
-            0,
+            1,
             0,
         );
         defer c.SDL_ReleaseGPUShader(device, vertex_shader);
@@ -73,7 +78,7 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !void {
         errdefer c.SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
     }
 
-    const vertexBufferSize = @sizeOf(PositionColorVertex) * 10;
+    const vertexBufferSize = @sizeOf(PositionColorVertex) * 4;
     vertex_buffer = try errify(c.SDL_CreateGPUBuffer(device, &.{
         .usage = c.SDL_GPU_BUFFERUSAGE_VERTEX,
         .size = vertexBufferSize,
@@ -87,19 +92,26 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !void {
     }));
     errdefer c.SDL_ReleaseGPUBuffer(device, index_buffer);
 
-    const drawBufferSize = (@sizeOf(c.SDL_GPUIndexedIndirectDrawCommand) * 1) + (@sizeOf(c.SDL_GPUIndirectDrawCommand) * 2);
+    const drawBufferSize = (@sizeOf(c.SDL_GPUIndexedIndirectDrawCommand) * 2);
     draw_buffer = try errify(c.SDL_CreateGPUBuffer(device, &.{
         .usage = c.SDL_GPU_BUFFERUSAGE_INDIRECT,
         .size = drawBufferSize,
     }));
     errdefer c.SDL_ReleaseGPUBuffer(device, draw_buffer);
 
+    const thingBufferSize = @sizeOf(PerDrawData) * 3;
+    things_buffer = try errify(c.SDL_CreateGPUBuffer(device, &.{
+        .usage = c.SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ,
+        .size = thingBufferSize,
+    }));
+    errdefer c.SDL_ReleaseGPUBuffer(device, things_buffer);
+
     // Set the buffer data
     const transferBuffer: *c.SDL_GPUTransferBuffer = try errify(c.SDL_CreateGPUTransferBuffer(
         device,
         &.{
             .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-            .size = vertexBufferSize + indexBufferSize + drawBufferSize,
+            .size = vertexBufferSize + indexBufferSize + drawBufferSize + thingBufferSize,
         },
     ));
     defer c.SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
@@ -110,27 +122,16 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !void {
         )));
         defer c.SDL_UnmapGPUTransferBuffer(device, transferBuffer);
 
-        transferData[0] = .{ .pos = .{ -1, -1, 0 }, .color = .{ 255, 0, 0, 255 } };
-        transferData[1] = .{ .pos = .{ 1, -1, 0 }, .color = .{ 0, 255, 0, 255 } };
-        transferData[2] = .{ .pos = .{ 1, 1, 0 }, .color = .{ 0, 0, 255, 255 } };
-        transferData[3] = .{ .pos = .{ -1, 1, 0 }, .color = .{ 255, 255, 255, 255 } };
+        transferData[0] = .{ .pos = .{ -0.5, -0.5, 0 }, .color = .{ 255, 0, 0, 255 } };
+        transferData[1] = .{ .pos = .{ 0.5, -0.5, 0 }, .color = .{ 0, 255, 0, 255 } };
+        transferData[2] = .{ .pos = .{ 0.5, 0.5, 0 }, .color = .{ 0, 0, 255, 255 } };
+        transferData[3] = .{ .pos = .{ -0.5, 0.5, 0 }, .color = .{ 255, 255, 255, 255 } };
 
-        transferData[4] = .{ .pos = .{ 1, -1, 0 }, .color = .{ 0, 255, 0, 255 } };
-        transferData[5] = .{ .pos = .{ 0, -1, 0 }, .color = .{ 0, 0, 255, 255 } };
-        transferData[6] = .{ .pos = .{ 0.5, 1, 0 }, .color = .{ 255, 0, 0, 255 } };
-        transferData[7] = .{ .pos = .{ -1, -1, 0 }, .color = .{ 0, 255, 0, 255 } };
-        transferData[8] = .{ .pos = .{ 0, -1, 0 }, .color = .{ 0, 0, 255, 255 } };
-        transferData[9] = .{ .pos = .{ -0.5, 1, 0 }, .color = .{ 255, 0, 0, 255 } };
+        const indexData: [*c][3]u16 = @ptrCast(transferData[4..]);
+        indexData[0] = .{ 0, 1, 2 };
+        indexData[1] = .{ 0, 2, 3 };
 
-        const indexData: [*c]u16 = @ptrCast(transferData[10..]);
-        indexData[0] = 0;
-        indexData[1] = 1;
-        indexData[2] = 2;
-        indexData[3] = 0;
-        indexData[4] = 2;
-        indexData[5] = 3;
-
-        const indexedDrawCommand: [*c]c.SDL_GPUIndexedIndirectDrawCommand = @ptrCast(@alignCast(indexData[6..]));
+        const indexedDrawCommand: [*c]c.SDL_GPUIndexedIndirectDrawCommand = @ptrCast(@alignCast(indexData[2..]));
         indexedDrawCommand[0] = .{
             .num_indices = 6,
             .num_instances = 1,
@@ -138,20 +139,18 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !void {
             .vertex_offset = 0,
             .first_instance = 0,
         };
+        indexedDrawCommand[1] = .{
+            .num_indices = 6,
+            .num_instances = 2,
+            .first_index = 0,
+            .vertex_offset = 0,
+            .first_instance = 1,
+        };
 
-        const drawCommands: [*c]c.SDL_GPUIndirectDrawCommand = @ptrCast(@alignCast(indexedDrawCommand[1..]));
-        drawCommands[0] = .{
-            .num_vertices = 3,
-            .num_instances = 1,
-            .first_vertex = 4,
-            .first_instance = 0,
-        };
-        drawCommands[1] = .{
-            .num_vertices = 3,
-            .num_instances = 1,
-            .first_vertex = 7,
-            .first_instance = 0,
-        };
+        const thingData: [*c]PerDrawData = @ptrCast(@alignCast(indexedDrawCommand[2..]));
+        thingData[0] = .{ .offset = .{ 0.25, 0.25 } };
+        thingData[1] = .{ .offset = .{ 0, -0.25 } };
+        thingData[2] = .{ .offset = .{ -0.8, 0 } };
     }
 
     const upload_cmd_buf = try errify(c.SDL_AcquireGPUCommandBuffer(device));
@@ -186,6 +185,15 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !void {
             .offset = 0,
             .size = drawBufferSize,
         }, false);
+
+        c.SDL_UploadToGPUBuffer(copy_pass, &.{
+            .transfer_buffer = transferBuffer,
+            .offset = vertexBufferSize + indexBufferSize + drawBufferSize,
+        }, &.{
+            .buffer = things_buffer,
+            .offset = 0,
+            .size = thingBufferSize,
+        }, false);
     }
 
     try errify(c.SDL_SubmitGPUCommandBuffer(upload_cmd_buf));
@@ -203,6 +211,12 @@ pub fn draw(device: *c.SDL_GPUDevice, cmdbuf: *c.SDL_GPUCommandBuffer, swapchain
     const render_pass = c.SDL_BeginGPURenderPass(cmdbuf, &color_target_info, 1, null);
 
     c.SDL_BindGPUGraphicsPipeline(render_pass, pipeline);
+    c.SDL_BindGPUVertexStorageBuffers(
+        render_pass,
+        0,
+        &things_buffer,
+        1,
+    );
     c.SDL_BindGPUVertexBuffers(render_pass, 0, &.{
         .buffer = vertex_buffer,
         .offset = 0,
@@ -211,13 +225,13 @@ pub fn draw(device: *c.SDL_GPUDevice, cmdbuf: *c.SDL_GPUCommandBuffer, swapchain
         .buffer = index_buffer,
         .offset = 0,
     }, c.SDL_GPU_INDEXELEMENTSIZE_16BIT);
-    c.SDL_DrawGPUIndexedPrimitivesIndirect(render_pass, draw_buffer, 0, 1);
-    c.SDL_DrawGPUPrimitivesIndirect(render_pass, draw_buffer, @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), 2);
+    c.SDL_DrawGPUIndexedPrimitivesIndirect(render_pass, draw_buffer, 0, 2);
 
     c.SDL_EndGPURenderPass(render_pass);
 }
 
 pub fn deinit(device: *c.SDL_GPUDevice) void {
+    c.SDL_ReleaseGPUBuffer(device, things_buffer);
     c.SDL_ReleaseGPUBuffer(device, draw_buffer);
     c.SDL_ReleaseGPUBuffer(device, index_buffer);
     c.SDL_ReleaseGPUBuffer(device, vertex_buffer);

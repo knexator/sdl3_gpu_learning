@@ -54,6 +54,7 @@ pub fn build(b: *std.Build) void {
         "PositionColor.vert",
         "PositionColorInstanced.vert",
         "PositionColorTransform.vert",
+        "PositionColorMine.vert",
         "SolidColor.frag",
     };
     inline for (shaders) |shader| {
