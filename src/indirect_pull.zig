@@ -5,8 +5,6 @@ const main = @import("main.zig");
 const loadShader = main.loadShader;
 const errify = main.errify;
 
-// NOT WORKING! seems like indexing issue
-
 var pipeline: *c.SDL_GPUGraphicsPipeline = undefined;
 var vertex_buffer: *c.SDL_GPUBuffer = undefined;
 var index_buffer: *c.SDL_GPUBuffer = undefined;
@@ -15,8 +13,7 @@ var things_buffer: *c.SDL_GPUBuffer = undefined;
 
 const VertexData = extern struct {
     pos: [3]f32,
-    // TODO: have this be [4]u8 and figure out how to transform it
-    color: [4]f32,
+    color: [4]u8,
 };
 
 const ThingData = extern struct {
@@ -103,10 +100,10 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !void {
         )));
         defer c.SDL_UnmapGPUTransferBuffer(device, transferBuffer);
 
-        transferData[0] = .{ .pos = .{ -0.5, -0.5, 0 }, .color = .{ 1, 0, 0, 1 } };
-        transferData[1] = .{ .pos = .{ 0.5, -0.5, 0 }, .color = .{ 0, 1, 0, 1 } };
-        transferData[2] = .{ .pos = .{ 0.5, 0.5, 0 }, .color = .{ 0, 0, 1, 1 } };
-        transferData[3] = .{ .pos = .{ -0.5, 0.5, 0 }, .color = .{ 1, 1, 1, 1 } };
+        transferData[0] = .{ .pos = .{ -0.5, -0.5, 0 }, .color = .{ 255, 0, 0, 255 } };
+        transferData[1] = .{ .pos = .{ 0.5, -0.5, 0 }, .color = .{ 0, 255, 0, 255 } };
+        transferData[2] = .{ .pos = .{ 0.5, 0.5, 0 }, .color = .{ 0, 0, 255, 255 } };
+        transferData[3] = .{ .pos = .{ -0.5, 0.5, 0 }, .color = .{ 255, 255, 255, 255 } };
 
         const indexData: [*c][3]u16 = @ptrCast(transferData[4..]);
         indexData[0] = .{ 0, 1, 2 };
