@@ -47,7 +47,11 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(app_exe);
 
-    const shadercross_exe = b.dependency("shadercross", .{}).path("bin/shadercross.exe");
+    const shadercross_exe = switch (b.graph.host.result.os.tag) {
+        .windows => b.dependency("shadercross_windows", .{}).path("bin/shadercross.exe"),
+        .linux => b.dependency("shadercross_linux", .{}).path("bin/shadercross"),
+        else => |t| std.debug.panic("unsupported os: {s}", .{@tagName(t)}),
+    };
     const shaders: []const []const u8 = &.{
         "UVColor.frag",
         "PullSpriteBatch.vert",

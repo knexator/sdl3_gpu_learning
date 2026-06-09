@@ -40,8 +40,11 @@
             .url = "git+https://codeberg.org/ziglang/translate-c?ref=zig-0.16.x#6fe0ffc4549f15c5f2d9432c2b4460ba90ff85ac",
             .hash = "translate_c-1.0.0-Q_BUWo_5BgD4flHdUhA31zOz0XvZk9k7lQv1ouzyNXj2",
         },
-        .shadercross = .{
+        .shadercross_windows = .{
             .path = "ungit/SDL3_shadercross-3.0.0-windows-VC-x64",
+        },
+        .shadercross_linux = .{
+            .path = "ungit/SDL3_shadercross-3.0.0-linux-x64",
         },
     },
     .paths = .{
