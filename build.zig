@@ -60,6 +60,7 @@ pub fn build(b: *std.Build) void {
         "PositionColorTransform.vert",
         "PositionColorMine.vert",
         "SolidColor.frag",
+        "IndirectPull.vert",
     };
     inline for (shaders) |shader| {
         const compile_shader_cmd = std.Build.Step.Run.create(b, "compile shader");

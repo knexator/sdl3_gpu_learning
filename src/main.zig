@@ -4,8 +4,7 @@ const c = @import("c");
 
 pub const std_options: std.Options = .{ .log_level = .debug };
 
-// const example = @import("indirect.zig");
-const example = @import("indirect_plus_per_draw_data.zig");
+const example = @import("indirect_pull.zig");
 
 const target_triple: [:0]const u8 = x: {
     var buf: [256]u8 = undefined;
