@@ -61,6 +61,8 @@ pub fn build(b: *std.Build) void {
         "PositionColorMine.vert",
         "SolidColor.frag",
         "IndirectPull.vert",
+        "TexturedQuad.vert",
+        "TexturedQuad.frag",
     };
     inline for (shaders) |shader| {
         const compile_shader_cmd = std.Build.Step.Run.create(b, "compile shader");
