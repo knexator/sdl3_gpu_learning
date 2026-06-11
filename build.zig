@@ -63,6 +63,8 @@ pub fn build(b: *std.Build) void {
         "IndirectPull.vert",
         "TexturedQuad.vert",
         "TexturedQuad.frag",
+        "CpuBatcher.vert",
+        "CpuBatcher.frag",
     };
     inline for (shaders) |shader| {
         const compile_shader_cmd = std.Build.Step.Run.create(b, "compile shader");

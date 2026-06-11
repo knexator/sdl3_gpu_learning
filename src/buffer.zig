@@ -13,10 +13,13 @@ pub fn Buffer(T: type) type {
         mapped_ptr: ?[*]T,
         mapped_len: usize,
 
+        cycle: bool = false,
+
         this_frame_upload_count: usize = 0,
 
         sdl_buffer: *c.SDL_GPUBuffer,
-        sdl_transfer_buffer: *c.SDL_GPUTransferBuffer,
+        // null if dynamic_count is 0
+        sdl_transfer_buffer: ?*c.SDL_GPUTransferBuffer,
 
         pub fn init(device: *c.SDL_GPUDevice, total_count: u32) !Self {
             const total_size: u32 = @sizeOf(T) * total_count;
@@ -46,39 +49,45 @@ pub fn Buffer(T: type) type {
                 .dynamic_count = total_count,
                 .mapped_ptr = null,
                 .mapped_len = 0,
+                .cycle = false,
                 .sdl_buffer = sdl_buffer,
                 .sdl_transfer_buffer = sdl_transfer_buffer,
             };
         }
 
         pub fn deinit(self: *Self, device: *c.SDL_GPUDevice) void {
-            c.SDL_ReleaseGPUTransferBuffer(device, self.sdl_transfer_buffer);
+            if (self.sdl_transfer_buffer) |tb| c.SDL_ReleaseGPUTransferBuffer(device, tb);
             c.SDL_ReleaseGPUBuffer(device, self.sdl_buffer);
         }
 
         pub fn freeze(self: *Self, device: *c.SDL_GPUDevice) void {
-            c.SDL_ReleaseGPUTransferBuffer(device, self.sdl_transfer_buffer);
+            if (self.sdl_transfer_buffer) |tb| c.SDL_ReleaseGPUTransferBuffer(device, tb);
             const queued_dynamic = self.dynamic_count - self.mapped_len;
             self.static_count += queued_dynamic;
             self.dynamic_count -= queued_dynamic;
-            self.sdl_transfer_buffer = errify(c.SDL_CreateGPUTransferBuffer(
-                device,
-                &.{
-                    .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-                    .size = @intCast(@sizeOf(T) * self.dynamic_count),
-                },
-            )) catch std.debug.panic("failed to freeze buffer; panicking to avoid leaving it in an inconsistent state", .{});
+            // creating a zero-sized transfer buffer crashes the backend, so drop it instead.
+            self.sdl_transfer_buffer = if (self.dynamic_count == 0)
+                null
+            else
+                errify(c.SDL_CreateGPUTransferBuffer(
+                    device,
+                    &.{
+                        .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+                        .size = @intCast(@sizeOf(T) * self.dynamic_count),
+                    },
+                )) catch std.debug.panic("failed to freeze buffer; panicking to avoid leaving it in an inconsistent state", .{});
         }
 
         pub fn startMap(self: *Self, device: *c.SDL_GPUDevice) !void {
+            if (self.dynamic_count == 0) @panic("cannot startMap on a full buffer");
             self.mapped_ptr = @ptrCast(@alignCast(try errify(
-                c.SDL_MapGPUTransferBuffer(device, self.sdl_transfer_buffer, false),
+                c.SDL_MapGPUTransferBuffer(device, self.sdl_transfer_buffer.?, self.cycle),
             )));
             self.mapped_len = self.dynamic_count;
         }
 
         pub fn endMap(self: *Self, device: *c.SDL_GPUDevice) void {
-            c.SDL_UnmapGPUTransferBuffer(device, self.sdl_transfer_buffer);
+            c.SDL_UnmapGPUTransferBuffer(device, self.sdl_transfer_buffer.?);
             self.mapped_ptr = null;
         }
 
@@ -93,13 +102,13 @@ pub fn Buffer(T: type) type {
         pub fn upload(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
             if (self.mapped_ptr != null) @panic("can't upload between .startMap and .endMap");
             c.SDL_UploadToGPUBuffer(copy_pass, &.{
-                .transfer_buffer = self.sdl_transfer_buffer,
+                .transfer_buffer = self.sdl_transfer_buffer.?,
                 .offset = 0,
             }, &.{
                 .buffer = self.sdl_buffer,
                 .offset = @intCast(@sizeOf(T) * self.static_count),
                 .size = @intCast(@sizeOf(T) * (self.dynamic_count - self.mapped_len)),
-            }, false);
+            }, self.cycle);
         }
     };
 }
