@@ -4,7 +4,10 @@ const c = @import("c");
 
 pub const std_options: std.Options = .{ .log_level = .debug };
 
-const example = @import("cpu_batcher.zig");
+const example = @import("reusable.zig");
+comptime {
+    std.testing.refAllDecls(example);
+}
 
 const target_triple: [:0]const u8 = x: {
     var buf: [256]u8 = undefined;
@@ -143,6 +146,11 @@ fn sdlAppEvent(appstate: ?*anyopaque, event: *c.SDL_Event) !c.SDL_AppResult {
     switch (event.type) {
         c.SDL_EVENT_QUIT => {
             return c.SDL_APP_SUCCESS;
+        },
+        c.SDL_EVENT_KEY_DOWN => {
+            if (event.key.scancode == c.SDL_SCANCODE_ESCAPE) {
+                return c.SDL_APP_SUCCESS;
+            }
         },
         else => {},
     }
